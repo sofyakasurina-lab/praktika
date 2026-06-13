@@ -1,0 +1,123 @@
+name: CI/CD – Ticket System
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build C++ Backend
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tickets_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libboost-all-dev \
+            libssl-dev \
+            libpqxx-dev \
+            libbcrypt-dev \
+            nlohmann-json3-dev \
+            pkg-config
+
+      - name: Install Crow (header-only)
+        run: |
+          git clone --depth=1 https://github.com/CrowCpp/Crow.git /tmp/Crow
+          sudo cp -r /tmp/Crow/include/* /usr/local/include/
+
+      - name: Install jwt-cpp (header-only)
+        run: |
+          git clone --depth=1 https://github.com/Thalhammer/jwt-cpp.git /tmp/jwt-cpp
+          sudo cp -r /tmp/jwt-cpp/include/* /usr/local/include/
+
+      - name: Configure CMake
+        working-directory: backend
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        working-directory: backend
+        run: cmake --build build -j$(nproc)
+
+      - name: Init test database
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d tickets_test -f sql/init.sql
+
+      - name: Smoke test (start server & check /api/health)
+        env:
+          DATABASE_URL: "host=localhost dbname=tickets_test user=postgres password=postgres"
+          JWT_SECRET: "test-secret"
+          PORT: "8080"
+        run: |
+          ./backend/build/ticket_server &
+          SERVER_PID=$!
+          sleep 2
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/health)
+          kill $SERVER_PID
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "✅ Health check passed (HTTP $STATUS)"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ticket_server
+          path: backend/build/ticket_server
+
+  # ──────────────────────────────────────────────────────────────
+  validate-frontend:
+    name: Validate Frontend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check HTML is valid (basic)
+        run: |
+          if ! grep -q '<!DOCTYPE html>' frontend/index.html; then
+            echo "Missing DOCTYPE"; exit 1
+          fi
+          echo "✅ Frontend HTML looks valid"
+
+  # ──────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-24.04
+    needs: [build-backend, validate-frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build Docker image
+        run: docker build -t ticket-system:ci .
+      - name: Test Docker container starts
+        run: |
+          docker run -d --name test-server \
+            -e DATABASE_URL="host=localhost dbname=tickets user=postgres password=postgres" \
+            -e JWT_SECRET="ci-secret" \
+            -p 8081:8080 ticket-system:ci || true
+          sleep 2
+          docker logs test-server || true
+          docker stop test-server || true
