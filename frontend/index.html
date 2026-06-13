@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Система учёта заявок</title>
+  <style>
+    /* ── Reset & Base ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb; --primary-hover: #1d4ed8;
+      --danger: #dc2626;  --success: #16a34a;
+      --bg: #f1f5f9;      --card: #ffffff;
+      --border: #e2e8f0;  --text: #1e293b;
+      --muted: #64748b;   --sidebar-w: 240px;
+      --radius: 10px;     --shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    input, textarea, select { font: inherit; }
+    button { cursor: pointer; font: inherit; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Layout ──────────────────────────────────────────────── */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+    #sidebar {
+      width: var(--sidebar-w); background: #1e293b; color: #f8fafc;
+      display: flex; flex-direction: column; flex-shrink: 0;
+      transition: transform .3s;
+    }
+    #sidebar .brand { padding: 20px 16px 12px; font-size: 1.1rem; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 8px; }
+    #sidebar .brand svg { width: 22px; height: 22px; fill: var(--primary); }
+    #sidebar nav { flex: 1; overflow-y: auto; padding: 8px 0; }
+    #sidebar nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-radius: 6px; margin: 2px 8px;
+      color: #94a3b8; transition: all .15s; font-size: .9rem;
+    }
+    #sidebar nav a:hover, #sidebar nav a.active { background: #334155; color: #f1f5f9; }
+    #sidebar nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
+    #sidebar .user-area { padding: 12px 16px; border-top: 1px solid #334155; display: flex; align-items: center; gap: 10px; }
+    #sidebar .user-area .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); display: grid; place-items: center; font-weight: 700; font-size: .85rem; }
+    #sidebar .user-area .info { flex: 1; overflow: hidden; }
+    #sidebar .user-area .name { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #sidebar .user-area .role { font-size: .75rem; color: #94a3b8; }
+    #sidebar .user-area button { background: none; border: none; color: #94a3b8; padding: 4px; border-radius: 4px; }
+    #sidebar .user-area button:hover { color: #f87171; }
+
+    #main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    #topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 12px; }
+    #topbar h1 { font-size: 1.1rem; font-weight: 600; flex: 1; }
+    #content { flex: 1; padding: 24px; }
+
+    /* ── Auth page ───────────────────────────────────────────── */
+    #auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e293b, #2563eb); }
+    .auth-card { background: var(--card); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,.25); }
+    .auth-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
+    .auth-card .sub { color: var(--muted); font-size: .88rem; margin-bottom: 24px; }
+    .auth-tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+    .auth-tabs button { flex: 1; padding: 8px; border: 2px solid var(--border); background: none; border-radius: 6px; font-size: .88rem; color: var(--muted); }
+    .auth-tabs button.active { border-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+    /* ── Form elements ───────────────────────────────────────── */
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 7px;
+      background: var(--bg); font-size: .9rem; transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+    .form-group textarea { resize: vertical; min-height: 90px; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: .88rem; font-weight: 600; border: none; transition: all .15s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-danger:hover  { background: #b91c1c; }
+    .btn-outline { background: none; border: 1.5px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--bg); }
+    .btn-sm { padding: 5px 12px; font-size: .82rem; }
+    .btn-block { width: 100%; justify-content: center; }
+
+    /* ── Cards ───────────────────────────────────────────────── */
+    .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .card-body { padding: 20px; }
+
+    /* ── Stat cards ──────────────────────────────────────────── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); border-left: 4px solid var(--primary); }
+    .stat-card .val { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .stat-card .lbl { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Filters bar ─────────────────────────────────────────── */
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    .filters input, .filters select { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 7px; background: var(--card); font-size: .85rem; }
+    .filters input { flex: 1; min-width: 180px; }
+
+    /* ── Ticket list table ───────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th { background: var(--bg); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 10px 14px; text-align: left; }
+    td { padding: 12px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+    .ticket-title { font-weight: 600; }
+    .ticket-title small { display: block; font-weight: 400; color: var(--muted); font-size: .78rem; margin-top: 2px; }
+
+    /* ── Badges ──────────────────────────────────────────────── */
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+
+    /* ── Modal ───────────────────────────────────────────────── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 100; overflow-y: auto; }
+    .modal { background: var(--card); border-radius: var(--radius); width: 100%; max-width: 640px; box-shadow: 0 20px 50px rgba(0,0,0,.3); animation: slide-up .2s ease; }
+    @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h3 { font-size: 1rem; font-weight: 700; }
+    .modal-header button { background: none; border: none; font-size: 1.4rem; color: var(--muted); line-height: 1; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* ── Detail page ─────────────────────────────────────────── */
+    .detail-grid { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+    @media(max-width:768px) { .detail-grid { grid-template-columns: 1fr; } }
+    .meta-box { background: var(--bg); border-radius: var(--radius); padding: 14px; }
+    .meta-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: .84rem; border-bottom: 1px solid var(--border); }
+    .meta-row:last-child { border: none; }
+    .meta-row .lbl { color: var(--muted); font-weight: 600; }
+    .comment { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .comment:last-child { border: none; }
+    .comment .av { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: grid; place-items: center; font-size: .8rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .comment .body .author { font-weight: 700; font-size: .84rem; }
+    .comment .body .date   { font-size: .75rem; color: var(--muted); }
+    .comment .body .text   { margin-top: 4px; font-size: .88rem; line-height: 1.5; }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    #toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: #f8fafc; padding: 12px 20px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: opacity .3s; z-index: 999; max-width: 320px; }
+    #toast.show { opacity: 1; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    #menu-btn { display: none; }
+    @media(max-width:768px) {
+      #sidebar { position: fixed; inset-y: 0; left: 0; z-index: 200; transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); }
+      #menu-btn { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1.5px solid var(--border); border-radius: 7px; background: none; }
+      #content { padding: 16px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .filters { flex-direction: column; }
+    }
+
+    .empty { text-align: center; color: var(--muted); padding: 40px; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+    .text-danger { color: var(--danger); font-size: .85rem; }
+  </style>
+</head>
+<body>
+
+<!-- ══ AUTH PAGE ══════════════════════════════════════════════════════════════ -->
+<div id="auth-page">
+  <div class="auth-card">
+    <h2>🎫 Учёт заявок</h2>
+    <p class="sub">Система управления задачами организации</p>
+    <div class="auth-tabs">
+      <button class="active" onclick="showTab('login')">Войти</button>
+      <button onclick="showTab('reg')">Регистрация</button>
+    </div>
+    <!-- Login -->
+    <div id="tab-login">
+      <div class="form-group"><label>Логин</label><input id="l-user" type="text" placeholder="admin" autocomplete="username"/></div>
+      <div class="form-group"><label>Пароль</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+      <p id="l-err" class="text-danger hidden"></p>
+      <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="doLogin()">Войти</button>
+      <p style="font-size:.8rem;color:var(--muted);margin-top:14px;text-align:center">
+        Demo: <strong>admin / password123</strong> · <strong>manager / password123</strong> · <strong>user1 / password123</strong>
+      </p>
+    </div>
+    <!-- Register -->
+    <div id="tab-reg" class="hidden">
+      <div class="form-group"><label>Логин *</label><input id="r-user" type="text" placeholder="username"/></div>
+      <div class="form-group"><label>Email *</label><input id="r-email" type="email" placeholder="you@company.ru"/></div>
+      <div class="form-group"><label>Полное имя</label><input id="r-name" type="text" placeholder="Иванов Иван"/></div>
+      <div class="form-group"><label>Пароль *</label><input id="r-pass" type="password" placeholder="min 6 символов"/></div>
+      <p id="r-err" class="text-danger hidden"></p>
+      <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="doRegister()">Создать аккаунт</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ════════════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      Заявки
+    </div>
+    <nav>
+      <a href="#" class="active" onclick="nav('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Дашборд
+      </a>
+      <a href="#" onclick="nav('tickets')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+        Все заявки
+      </a>
+      <a href="#" onclick="nav('create')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        Создать заявку
+      </a>
+    </nav>
+    <div class="user-area">
+      <div class="avatar" id="sb-av"></div>
+      <div class="info">
+        <div class="name" id="sb-name"></div>
+        <div class="role" id="sb-role"></div>
+      </div>
+      <button title="Выйти" onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="topbar">
+      <button id="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <h1 id="page-title">Дашборд</h1>
+    </div>
+    <div id="content">
+      <!-- Views injected here -->
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODALS ══════════════════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div id="modal" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-title">Редактировать заявку</h3>
+      <button onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ─── Config ────────────────────────────────────────────────────────────────────
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8080/api'
+  : '/api';  // Same-origin in production
+
+// ─── State ─────────────────────────────────────────────────────────────────────
+let token = localStorage.getItem('token') || '';
+let user  = JSON.parse(localStorage.getItem('user') || 'null');
+let currentView = 'dashboard';
+
+// ─── Utils ─────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+  return data;
+}
+
+function toast(msg, duration = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function badge(name, color) {
+  return `<span class="badge" style="background:${color}22;color:${color}">${name}</span>`;
+}
+
+function avatar(name) {
+  return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────────
+function showTab(t) {
+  document.querySelectorAll('.auth-tabs button').forEach((b, i) => b.classList.toggle('active', (t === 'login') === (i === 0)));
+  document.getElementById('tab-login').classList.toggle('hidden', t !== 'login');
+  document.getElementById('tab-reg').classList.toggle('hidden', t !== 'reg');
+}
+
+async function doLogin() {
+  const username = document.getElementById('l-user').value.trim();
+  const password = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('l-err');
+  errEl.classList.add('hidden');
+  try {
+    const data = await api('POST', '/auth/login', { username, password });
+    token = data.token; user = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    initApp();
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+}
+
+async function doRegister() {
+  const errEl = document.getElementById('r-err');
+  errEl.classList.add('hidden');
+  try {
+    const data = await api('POST', '/auth/register', {
+      username:  document.getElementById('r-user').value.trim(),
+      email:     document.getElementById('r-email').value.trim(),
+      full_name: document.getElementById('r-name').value.trim(),
+      password:  document.getElementById('r-pass').value,
+    });
+    token = data.token; user = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    initApp();
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+}
+
+function logout() {
+  token = ''; user = null;
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-page').classList.remove('hidden');
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+function initApp() {
+  document.getElementById('auth-page').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('sb-av').textContent   = avatar(user.full_name || user.username);
+  document.getElementById('sb-name').textContent = user.full_name || user.username;
+  document.getElementById('sb-role').textContent = {admin:'Администратор', manager:'Менеджер', user:'Пользователь'}[user.role] || user.role;
+  nav('dashboard');
+}
+
+function nav(view) {
+  currentView = view;
+  document.querySelectorAll('#sidebar nav a').forEach((a, i) => {
+    a.classList.toggle('active', ['dashboard','tickets','create'][i] === view);
+  });
+  const titles = { dashboard:'Дашборд', tickets:'Все заявки', create:'Создать заявку' };
+  document.getElementById('page-title').textContent = titles[view] || view;
+  document.getElementById('sidebar').classList.remove('open');
+
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  if (view === 'dashboard') renderDashboard();
+  else if (view === 'tickets') renderTickets();
+  else if (view === 'create') renderCreateForm();
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────────
+async function renderDashboard() {
+  const [stats, tickets] = await Promise.all([api('GET','/stats'), api('GET','/tickets')]);
+  const content = document.getElementById('content');
+
+  const recent = tickets.slice(0, 5).map(t => `
+    <tr onclick="openTicket(${t.id})" style="cursor:pointer">
+      <td><div class="ticket-title">${esc(t.title)}</div><small>#${t.id}</small></td>
+      <td>${badge(t.status, t.status_color)}</td>
+      <td>${badge(t.priority, t.priority_color)}</td>
+      <td style="font-size:.8rem;color:var(--muted)">${fmtDate(t.created_at)}</td>
+    </tr>`).join('');
+
+  content.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Всего заявок</div></div>
+      ${stats.by_status.map(s => `
+        <div class="stat-card" style="border-left-color:${s.color}">
+          <div class="val">${s.count}</div><div class="lbl">${s.name}</div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header"><strong>Последние заявки</strong>
+        <button class="btn btn-outline btn-sm" onclick="nav('tickets')">Все →</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Заявка</th><th>Статус</th><th>Приоритет</th><th>Дата</th></tr></thead>
+        <tbody>${recent || '<tr><td colspan="4" class="empty">Заявок пока нет</td></tr>'}</tbody></table>
+      </div>
+    </div>`;
+}
+
+// ─── Tickets list ───────────────────────────────────────────────────────────────
+let filters = { search:'', status:'', category:'', priority:'' };
+
+async function renderTickets() {
+  const [tickets, statuses, categories, priorities] = await Promise.all([
+    api('GET', '/tickets?' + new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([,v])=>v)))),
+    api('GET', '/statuses'),
+    api('GET', '/categories'),
+    api('GET', '/priorities'),
+  ]);
+  const content = document.getElementById('content');
+
+  const rows = tickets.map(t => `
+    <tr onclick="openTicket(${t.id})" style="cursor:pointer">
+      <td><div class="ticket-title">${esc(t.title)}</div><small style="color:var(--muted)">#${t.id} · ${esc(t.category||'—')}</small></td>
+      <td>${badge(t.status, t.status_color)}</td>
+      <td>${badge(t.priority, t.priority_color)}</td>
+      <td style="font-size:.83rem">${esc(t.creator_name)}</td>
+      <td style="font-size:.83rem">${t.assignee_name ? esc(t.assignee_name) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td style="font-size:.8rem;color:var(--muted)">${fmtDate(t.created_at)}</td>
+    </tr>`).join('');
+
+  content.innerHTML = `
+    <div class="filters">
+      <input placeholder="🔍 Поиск по названию…" value="${esc(filters.search)}" oninput="filters.search=this.value;applyFilters()"/>
+      <select onchange="filters.status=this.value;applyFilters()">
+        <option value="">Все статусы</option>
+        ${statuses.map(s=>`<option value="${esc(s.name)}" ${filters.status===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+      <select onchange="filters.category=this.value;applyFilters()">
+        <option value="">Все категории</option>
+        ${categories.map(c=>`<option value="${esc(c.name)}" ${filters.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+      </select>
+      <select onchange="filters.priority=this.value;applyFilters()">
+        <option value="">Все приоритеты</option>
+        ${priorities.map(p=>`<option value="${esc(p.name)}" ${filters.priority===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary" onclick="nav('create')">+ Создать</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Заявка</th><th>Статус</th><th>Приоритет</th><th>Автор</th><th>Исполнитель</th><th>Дата</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6" class="empty">Заявки не найдены</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+let searchTimer;
+function applyFilters() { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderTickets(), 400); }
+
+// ─── Create form ────────────────────────────────────────────────────────────────
+async function renderCreateForm() {
+  const [statuses, categories, priorities] = await Promise.all([
+    api('GET','/statuses'), api('GET','/categories'), api('GET','/priorities')
+  ]);
+  document.getElementById('content').innerHTML = `
+    <div class="card" style="max-width:640px">
+      <div class="card-header"><strong>Новая заявка</strong></div>
+      <div class="card-body">
+        <div class="form-group"><label>Название *</label><input id="ct" placeholder="Опишите проблему кратко"/></div>
+        <div class="form-group"><label>Описание</label><textarea id="cd" placeholder="Подробное описание…"></textarea></div>
+        <div class="form-group"><label>Категория</label>
+          <select id="cc"><option value="">— не указана —</option>
+          ${categories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Приоритет</label>
+          <select id="cp">${priorities.map(p=>`<option value="${p.id}" ${p.id===2?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Срок исполнения</label><input id="cdd" type="datetime-local"/></div>
+        <p id="c-err" class="text-danger hidden"></p>
+        <button class="btn btn-primary" onclick="submitCreate()">Создать заявку</button>
+      </div>
+    </div>`;
+}
+
+async function submitCreate() {
+  const errEl = document.getElementById('c-err');
+  errEl.classList.add('hidden');
+  const title = document.getElementById('ct').value.trim();
+  if (!title) { errEl.textContent = 'Укажите название'; errEl.classList.remove('hidden'); return; }
+  try {
+    const data = await api('POST', '/tickets', {
+      title, description: document.getElementById('cd').value.trim(),
+      category_id: parseInt(document.getElementById('cc').value) || 0,
+      priority_id: parseInt(document.getElementById('cp').value) || 2,
+      due_date: document.getElementById('cdd').value || '',
+    });
+    toast('✅ Заявка #' + data.id + ' создана');
+    nav('tickets');
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+}
+
+// ─── Ticket detail ──────────────────────────────────────────────────────────────
+async function openTicket(id) {
+  const [t, statuses, priorities, users] = await Promise.all([
+    api('GET', '/tickets/' + id),
+    api('GET', '/statuses'),
+    api('GET', '/priorities'),
+    (user.role !== 'user') ? api('GET', '/users') : Promise.resolve([]),
+  ]);
+
+  const canEdit = user.role !== 'user' || t.creator_id === user.id;
+  const isAdmin = user.role === 'admin';
+  const isManager = user.role === 'manager' || user.role === 'admin';
+
+  document.getElementById('modal-title').textContent = `#${t.id} · ${t.title}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="detail-grid">
+      <div>
+        <p style="line-height:1.6;font-size:.9rem;color:var(--muted);margin-bottom:16px">${esc(t.description||'Описание не указано')}</p>
+        <div style="margin-bottom:16px">
+          <strong style="font-size:.85rem">Комментарии (${t.comments.length})</strong>
+          <div id="comments-list" style="margin-top:10px">
+            ${t.comments.map(c => `
+              <div class="comment">
+                <div class="av">${avatar(c.author_name)}</div>
+                <div class="body">
+                  <div><span class="author">${esc(c.author_name)}</span>
+                    <span class="date" style="margin-left:8px">${fmtDate(c.created_at)}</span></div>
+                  <div class="text">${esc(c.content)}</div>
+                </div>
+              </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem">Комментариев пока нет</p>'}
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Добавить комментарий</label>
+          <textarea id="new-comment" rows="3" placeholder="Введите комментарий…"></textarea>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addComment(${t.id})">Отправить</button>
+      </div>
+      <div>
+        <div class="meta-box">
+          <div class="meta-row"><span class="lbl">Статус</span>
+            ${canEdit ? `<select id="e-status" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--border);border-radius:5px">
+              ${statuses.map(s=>`<option value="${s.id}" ${s.id===t.status_id?'selected':''}>${s.name}</option>`).join('')}
+            </select>` : badge(t.status, t.status_color)}
+          </div>
+          <div class="meta-row"><span class="lbl">Приоритет</span>
+            ${canEdit ? `<select id="e-priority" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--border);border-radius:5px">
+              ${priorities.map(p=>`<option value="${p.id}" ${p.id===t.priority_id?'selected':''}>${p.name}</option>`).join('')}
+            </select>` : badge(t.priority, t.priority_color)}
+          </div>
+          <div class="meta-row"><span class="lbl">Категория</span><span>${badge(t.category||'—','#6c757d')}</span></div>
+          <div class="meta-row"><span class="lbl">Автор</span><span style="font-size:.82rem">${esc(t.creator_name)}</span></div>
+          <div class="meta-row"><span class="lbl">Исполнитель</span>
+            ${isManager ? `<select id="e-assignee" style="font-size:.82rem;padding:3px 6px;border:1px solid var(--border);border-radius:5px">
+              <option value="0">— нет —</option>
+              ${users.map(u=>`<option value="${u.id}" ${u.id===t.assignee_id?'selected':''}>${esc(u.full_name||u.username)}</option>`).join('')}
+            </select>` : `<span style="font-size:.82rem">${esc(t.assignee_name||'—')}</span>`}
+          </div>
+          <div class="meta-row"><span class="lbl">Создана</span><span style="font-size:.78rem;color:var(--muted)">${fmtDate(t.created_at)}</span></div>
+          <div class="meta-row"><span class="lbl">Обновлена</span><span style="font-size:.78rem;color:var(--muted)">${fmtDate(t.updated_at)}</span></div>
+          ${t.due_date ? `<div class="meta-row"><span class="lbl">Срок</span><span style="font-size:.78rem;color:var(--muted)">${fmtDate(t.due_date)}</span></div>` : ''}
+        </div>
+        ${t.history.length ? `
+          <div style="margin-top:14px">
+            <strong style="font-size:.82rem;color:var(--muted)">История изменений</strong>
+            ${t.history.slice(0,5).map(h=>`
+              <div style="font-size:.78rem;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border)">
+                <strong>${esc(h.full_name)}</strong> изменил <em>${esc(h.field)}</em><br/>
+                ${esc(h.old_value)} → ${esc(h.new_value)} · ${fmtDate(h.changed_at)}
+              </div>`).join('')}
+          </div>` : ''}
+        ${isAdmin ? `<button class="btn btn-danger btn-sm btn-block" style="margin-top:14px" onclick="deleteTicket(${t.id})">Удалить заявку</button>` : ''}
+      </div>
+    </div>`;
+
+  document.getElementById('modal-footer').innerHTML = canEdit ? `
+    <button class="btn btn-outline" onclick="closeModal()">Закрыть</button>
+    <button class="btn btn-primary" onclick="saveTicket(${t.id})">Сохранить</button>` :
+    `<button class="btn btn-primary" onclick="closeModal()">Закрыть</button>`;
+
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+async function saveTicket(id) {
+  try {
+    const body = {};
+    if (document.getElementById('e-status'))   body.status_id   = parseInt(document.getElementById('e-status').value);
+    if (document.getElementById('e-priority')) body.priority_id = parseInt(document.getElementById('e-priority').value);
+    if (document.getElementById('e-assignee')) body.assignee_id = parseInt(document.getElementById('e-assignee').value);
+    await api('PUT', '/tickets/' + id, body);
+    toast('✅ Заявка сохранена');
+    closeModal();
+    if (currentView === 'tickets') renderTickets();
+    if (currentView === 'dashboard') renderDashboard();
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function addComment(ticket_id) {
+  const content = document.getElementById('new-comment').value.trim();
+  if (!content) return;
+  try {
+    await api('POST', '/tickets/' + ticket_id + '/comments', { content });
+    toast('💬 Комментарий добавлен');
+    openTicket(ticket_id);
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function deleteTicket(id) {
+  if (!confirm('Удалить заявку #' + id + '?')) return;
+  try {
+    await api('DELETE', '/tickets/' + id);
+    toast('🗑️ Заявка удалена');
+    closeModal();
+    renderTickets();
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Boot ───────────────────────────────────────────────────────────────────────
+if (token && user) { initApp(); }
+</script>
+</body>
+</html>
