@@ -93,8 +93,8 @@ crow::response err(int code, const std::string& msg) {
 int main() {
     crow::App<crow::CORSHandler> app;
 
-    auto& cors = app.get_middleware<crow::CORSHandler>();
-    cors.global()
+    app.get_middleware<crow::CORSHandler>()
+        .global()
         .headers("Authorization", "Content-Type")
         .methods("GET"_method, "POST"_method, "PUT"_method, "DELETE"_method, "OPTIONS"_method)
         .origin("*");
@@ -251,7 +251,7 @@ int main() {
                 params.push_back("%" + search + "%");
                 pi++;
             }
-            for (auto& c : cond) sql += " AND " + c;
+            for (const auto& c : cond) sql += " AND " + c;
             sql += " ORDER BY p.level DESC, t.created_at DESC";
 
             auto conn = make_conn();
@@ -269,7 +269,7 @@ int main() {
             }
 
             json arr = json::array();
-            for (auto& row : res) {
+            for (const auto& row : res) {
                 json t;
                 t["id"]               = row["id"].as<int>();
                 t["title"]            = row["title"].c_str();
@@ -319,7 +319,7 @@ int main() {
                 "WHERE t.id = $1", id);
             if (res.empty()) return err(404, "Заявка не найдена");
 
-            auto& row = res[0];
+            const auto& row = res[0];
             // Access check: regular users can see only their own tickets
             if (ti.role == "user" && row["creator_id"].as<int>() != ti.user_id)
                 return err(403, "Нет доступа");
@@ -354,7 +354,7 @@ int main() {
                 "FROM comments c JOIN users u ON c.author_id = u.id "
                 "WHERE c.ticket_id = $1 ORDER BY c.created_at", id);
             json comments = json::array();
-            for (auto& cr : cres) {
+            for (const auto& cr : cres) {
                 comments.push_back({
                     {"id", cr["id"].as<int>()},
                     {"content", cr["content"].c_str()},
@@ -371,7 +371,7 @@ int main() {
                 "FROM ticket_history h JOIN users u ON h.user_id = u.id "
                 "WHERE h.ticket_id = $1 ORDER BY h.changed_at DESC LIMIT 20", id);
             json history = json::array();
-            for (auto& hr : hres) {
+            for (const auto& hr : hres) {
                 history.push_back({
                     {"field", hr["field"].c_str()},
                     {"old_value", hr["old_value"].is_null() ? "" : hr["old_value"].c_str()},
@@ -536,7 +536,7 @@ int main() {
             pqxx::work tx(conn);
             auto res = tx.exec("SELECT id, name, description, color FROM categories ORDER BY name");
             json arr = json::array();
-            for (auto& row : res) {
+            for (const auto& row : res) {
                 arr.push_back({
                     {"id", row["id"].as<int>()},
                     {"name", row["name"].c_str()},
@@ -558,7 +558,7 @@ int main() {
             pqxx::work tx(conn);
             auto res = tx.exec("SELECT id, name, color FROM statuses ORDER BY id");
             json arr = json::array();
-            for (auto& row : res) {
+            for (const auto& row : res) {
                 arr.push_back({
                     {"id", row["id"].as<int>()},
                     {"name", row["name"].c_str()},
@@ -579,7 +579,7 @@ int main() {
             pqxx::work tx(conn);
             auto res = tx.exec("SELECT id, name, level, color FROM priorities ORDER BY level");
             json arr = json::array();
-            for (auto& row : res) {
+            for (const auto& row : res) {
                 arr.push_back({
                     {"id", row["id"].as<int>()},
                     {"name", row["name"].c_str()},
@@ -605,7 +605,7 @@ int main() {
                 "FROM users u JOIN roles r ON u.role_id = r.id "
                 "WHERE u.is_active = TRUE ORDER BY u.full_name");
             json arr = json::array();
-            for (auto& row : res) {
+            for (const auto& row : res) {
                 arr.push_back({
                     {"id", row["id"].as<int>()},
                     {"username", row["username"].c_str()},
@@ -644,7 +644,7 @@ int main() {
             json stats;
             stats["total"] = total[0][0].as<int>();
             stats["by_status"] = json::array();
-            for (auto& r : by_status) {
+            for (const auto& r : by_status) {
                 stats["by_status"].push_back({
                     {"name", r["name"].c_str()},
                     {"color", r["color"].c_str()},
@@ -652,7 +652,7 @@ int main() {
                 });
             }
             stats["by_priority"] = json::array();
-            for (auto& r : by_priority) {
+            for (const auto& r : by_priority) {
                 stats["by_priority"].push_back({
                     {"name", r["name"].c_str()},
                     {"color", r["color"].c_str()},

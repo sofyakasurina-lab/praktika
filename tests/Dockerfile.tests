@@ -1,0 +1,16 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential cmake \
+    libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tests
+COPY . .
+
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j$(nproc)
+
+# Запускаем тесты против backend (передаём URL через аргумент)
+CMD ["./build/run_tests", "http://backend:8080"]

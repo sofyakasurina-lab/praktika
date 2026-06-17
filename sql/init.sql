@@ -143,10 +143,10 @@ CREATE TRIGGER trg_tickets_updated_at
 
 -- Пользователи (пароль: "password123" — bcrypt-хеш)
 INSERT INTO users (username, email, password_hash, role_id, full_name) VALUES
-    ('admin',   'admin@company.ru',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewFhWmNkYfWMNp6e', 1, 'Администратор Системы'),
-    ('manager', 'manager@company.ru', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewFhWmNkYfWMNp6e', 2, 'Иванов Иван Иванович'),
-    ('user1',   'user1@company.ru',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewFhWmNkYfWMNp6e', 3, 'Петрова Мария Сергеевна'),
-    ('user2',   'user2@company.ru',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewFhWmNkYfWMNp6e', 3, 'Сидоров Алексей Николаевич')
+    ('admin',   'admin@company.ru',   '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.', 1, 'Администратор Системы'),
+    ('manager', 'manager@company.ru', '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.', 2, 'Иванов Иван Иванович'),
+    ('user1',   'user1@company.ru',   '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.', 3, 'Петрова Мария Сергеевна'),
+    ('user2',   'user2@company.ru',   '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.', 3, 'Сидоров Алексей Николаевич')
 ON CONFLICT DO NOTHING;
 
 -- Тестовые заявки

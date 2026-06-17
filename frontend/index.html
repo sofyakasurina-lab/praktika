@@ -316,12 +316,18 @@ async function doLogin() {
 async function doRegister() {
   const errEl = document.getElementById('r-err');
   errEl.classList.add('hidden');
+  const pass = document.getElementById('r-pass').value;
+  if (pass.length < 6) {
+      document.getElementById('r-err').textContent = 'Пароль должен быть минимум 6 символов';
+      document.getElementById('r-err').classList.remove('hidden');
+      return;
+  }
   try {
     const data = await api('POST', '/auth/register', {
       username:  document.getElementById('r-user').value.trim(),
       email:     document.getElementById('r-email').value.trim(),
       full_name: document.getElementById('r-name').value.trim(),
-      password:  document.getElementById('r-pass').value,
+      password: pass,
     });
     token = data.token; user = data.user;
     localStorage.setItem('token', token);
