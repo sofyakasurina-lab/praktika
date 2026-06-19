@@ -41,12 +41,14 @@ jobs:
             libasio-dev \
             nlohmann-json3-dev \
             pkg-config
-      
-      - name: Install bcrypt header
+
+      - name: Install libbcrypt from source
         run: |
-          git clone --depth=1 https://github.com/hilch/Bcrypt.cpp.git /tmp/bcrypt
-          sudo mkdir -p /usr/local/include/bcrypt
-          sudo cp /tmp/bcrypt/include/bcrypt/BCrypt.hpp /usr/local/include/bcrypt/
+          git clone https://github.com/trusch/libbcrypt.git /tmp/libbcrypt
+          cmake -S /tmp/libbcrypt -B /tmp/libbcrypt/build -DCMAKE_BUILD_TYPE=Release
+          sudo cmake --build /tmp/libbcrypt/build -j$(nproc)
+          sudo cmake --install /tmp/libbcrypt/build --prefix /usr/local
+          rm -rf /tmp/libbcrypt
 
       - name: Install Crow (header-only)
         run: |
