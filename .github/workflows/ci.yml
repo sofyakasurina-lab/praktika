@@ -38,7 +38,7 @@ jobs:
             libboost-all-dev \
             libssl-dev \
             libpqxx-dev \
-            libbcrypt-dev \
+            libcrypt-dev \
             nlohmann-json3-dev \
             pkg-config
 

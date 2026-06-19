@@ -1,6 +1,3 @@
-// ============================================================
-// Система учёта заявок — Backend (C++ / Crow + libpqxx)
-// ============================================================
 #include "crow.h"
 #include "crow/middlewares/cors.h"
 
@@ -18,7 +15,7 @@
 
 using json = nlohmann::json;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 static std::string env(const char* key, const char* def = "") {
     const char* v = std::getenv(key);
@@ -28,10 +25,10 @@ static std::string env(const char* key, const char* def = "") {
 static const std::string DB_CONN  = env("DATABASE_URL", "host=localhost dbname=tickets user=postgres password=postgres");
 static const std::string JWT_SECRET = env("JWT_SECRET", "super-secret-key-change-in-production");
 
-// Shared connection pool simulation: create new connection per request (simple approach)
+// Моделирование общего пула подключений: создание нового соединения по запросу (простой подход)
 pqxx::connection make_conn() { return pqxx::connection(DB_CONN); }
 
-// ─── JWT helpers ──────────────────────────────────────────────────────────────
+// JWT helpers
 
 std::string make_token(int user_id, const std::string& role) {
     auto now = std::chrono::system_clock::now();
@@ -69,7 +66,7 @@ TokenInfo auth_from_request(const crow::request& req) {
     return {0, "", false};
 }
 
-// ─── Response helpers ─────────────────────────────────────────────────────────
+// Response helpers
 
 crow::response ok(const json& body) {
     auto r = crow::response(200, body.dump());
@@ -88,7 +85,7 @@ crow::response err(int code, const std::string& msg) {
     return r;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 
 int main() {
     crow::App<crow::CORSHandler> app;
@@ -99,7 +96,7 @@ int main() {
         .methods("GET"_method, "POST"_method, "PUT"_method, "DELETE"_method, "OPTIONS"_method)
         .origin("*");
 
-    // ── POST /api/auth/login ──────────────────────────────────────────────────
+    // POST /api/auth/login
     CROW_ROUTE(app, "/api/auth/login").methods("POST"_method)
     ([](const crow::request& req) -> crow::response {
         try {
@@ -138,7 +135,7 @@ int main() {
         }
     });
 
-    // ── POST /api/auth/register ───────────────────────────────────────────────
+    // POST /api/auth/register
     CROW_ROUTE(app, "/api/auth/register").methods("POST"_method)
     ([](const crow::request& req) -> crow::response {
         try {
@@ -174,7 +171,7 @@ int main() {
         }
     });
 
-    // ── GET /api/auth/me ──────────────────────────────────────────────────────
+    // GET /api/auth/me
     CROW_ROUTE(app, "/api/auth/me").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -198,7 +195,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/tickets ──────────────────────────────────────────────────────
+    // GET /api/tickets
     CROW_ROUTE(app, "/api/tickets").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -224,7 +221,7 @@ int main() {
                 "LEFT JOIN users u2 ON t.assignee_id = u2.id "
                 "WHERE 1=1 ";
 
-            // Role-based filtering: regular users see only their own tickets
+            // Фильтрация на основе ролей: обычные пользователи видят только свои собственные заявки
             std::vector<std::string> cond;
             std::vector<std::string> params;
             int pi = 1;
@@ -258,7 +255,7 @@ int main() {
             pqxx::work tx(conn);
             pqxx::result res;
 
-            // Execute with correct number of params
+            // Выполнение с правильным количеством параметров
             switch (params.size()) {
                 case 0: res = tx.exec(sql); break;
                 case 1: res = tx.exec_params(sql, params[0]); break;
@@ -295,7 +292,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/tickets/:id ──────────────────────────────────────────────────
+    // GET /api/tickets/:id
     CROW_ROUTE(app, "/api/tickets/<int>").methods("GET"_method)
     ([](const crow::request& req, int id) -> crow::response {
         auto ti = auth_from_request(req);
@@ -320,7 +317,7 @@ int main() {
             if (res.empty()) return err(404, "Заявка не найдена");
 
             const auto& row = res[0];
-            // Access check: regular users can see only their own tickets
+            // Проверка доступа: обычные пользователи могут просматривать только свои собственные билеты
             if (ti.role == "user" && row["creator_id"].as<int>() != ti.user_id)
                 return err(403, "Нет доступа");
 
@@ -348,7 +345,7 @@ int main() {
             t["assignee_id"]      = row["assignee_id"].is_null() ? 0 : row["assignee_id"].as<int>();
             t["assignee_name"]    = row["assignee_name"].is_null() ? "" : row["assignee_name"].c_str();
 
-            // Comments
+            // Комментарии
             auto cres = tx.exec_params(
                 "SELECT c.id, c.content, c.created_at, u.full_name as author_name, u.username "
                 "FROM comments c JOIN users u ON c.author_id = u.id "
@@ -365,7 +362,7 @@ int main() {
             }
             t["comments"] = comments;
 
-            // History
+            // История
             auto hres = tx.exec_params(
                 "SELECT h.field, h.old_value, h.new_value, h.changed_at, u.full_name "
                 "FROM ticket_history h JOIN users u ON h.user_id = u.id "
@@ -386,7 +383,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── POST /api/tickets ─────────────────────────────────────────────────────
+    // POST /api/tickets
     CROW_ROUTE(app, "/api/tickets").methods("POST"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -426,7 +423,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── PUT /api/tickets/:id ──────────────────────────────────────────────────
+    // PUT /api/tickets/:id
     CROW_ROUTE(app, "/api/tickets/<int>").methods("PUT"_method)
     ([](const crow::request& req, int id) -> crow::response {
         auto ti = auth_from_request(req);
@@ -436,15 +433,15 @@ int main() {
             auto conn = make_conn();
             pqxx::work tx(conn);
 
-            // Fetch current ticket
+            // Получить текущий билет
             auto cur = tx.exec_params("SELECT * FROM tickets WHERE id = $1", id);
             if (cur.empty()) return err(404, "Заявка не найдена");
 
-            // Only creator or admin/manager can edit
+            // Редактировать может только создатель или admin/manager
             if (ti.role == "user" && cur[0]["creator_id"].as<int>() != ti.user_id)
                 return err(403, "Нет доступа");
 
-            // Record history for changed fields
+            // История записей для измененных полей
             auto log_change = [&](const std::string& field, const std::string& old_val, const std::string& new_val) {
                 if (old_val != new_val) {
                     tx.exec_params(
@@ -464,7 +461,7 @@ int main() {
             log_change("status_id",   cur[0]["status_id"].c_str(),   std::to_string(status_id));
             log_change("priority_id", cur[0]["priority_id"].c_str(), std::to_string(priority_id));
 
-            // Handle assignee (admin/manager only)
+            // Обращение к правоприемнику (только к admin/manager)
             int assignee_id = cur[0]["assignee_id"].is_null() ? 0 : cur[0]["assignee_id"].as<int>();
             if (body.contains("assignee_id") && ti.role != "user") {
                 int new_assignee = body["assignee_id"].get<int>();
@@ -472,7 +469,7 @@ int main() {
                 assignee_id = new_assignee;
             }
 
-            // Set closed_at if status is 4 (Выполнена) or 5 (Отклонена)
+            // Установка closed_at если статус равен 4 (Выполнена) или 5 (Отклонена)
             std::string closed_sql = status_id >= 4
                 ? ", closed_at = NOW()"
                 : ", closed_at = NULL";
@@ -491,7 +488,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── DELETE /api/tickets/:id ───────────────────────────────────────────────
+    // DELETE /api/tickets/:id
     CROW_ROUTE(app, "/api/tickets/<int>").methods("DELETE"_method)
     ([](const crow::request& req, int id) -> crow::response {
         auto ti = auth_from_request(req);
@@ -506,7 +503,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── POST /api/tickets/:id/comments ────────────────────────────────────────
+    // POST /api/tickets/:id/comments
     CROW_ROUTE(app, "/api/tickets/<int>/comments").methods("POST"_method)
     ([](const crow::request& req, int ticket_id) -> crow::response {
         auto ti = auth_from_request(req);
@@ -526,7 +523,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/categories ───────────────────────────────────────────────────
+    // GET /api/categories
     CROW_ROUTE(app, "/api/categories").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -548,7 +545,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/statuses ─────────────────────────────────────────────────────
+    // GET /api/statuses
     CROW_ROUTE(app, "/api/statuses").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -569,7 +566,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/priorities ───────────────────────────────────────────────────
+    // GET /api/priorities
     CROW_ROUTE(app, "/api/priorities").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -591,7 +588,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/users ────────────────────────────────────────────────────────
+    // GET /api/users
     CROW_ROUTE(app, "/api/users").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -618,7 +615,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── GET /api/stats ────────────────────────────────────────────────────────
+    // GET /api/stats
     CROW_ROUTE(app, "/api/stats").methods("GET"_method)
     ([](const crow::request& req) -> crow::response {
         auto ti = auth_from_request(req);
@@ -664,7 +661,7 @@ int main() {
         } catch (const std::exception& e) { return err(500, e.what()); }
     });
 
-    // ── Health check ──────────────────────────────────────────────────────────
+    // Health check
     CROW_ROUTE(app, "/api/health")
     ([]() { return crow::response(200, "{\"status\":\"ok\"}"); });
 
