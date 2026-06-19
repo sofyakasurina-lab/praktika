@@ -44,8 +44,9 @@ jobs:
       
       - name: Install bcrypt header
         run: |
+          git clone --depth=1 https://github.com/hilch/Bcrypt.cpp.git /tmp/bcrypt
           sudo mkdir -p /usr/local/include/bcrypt
-          sudo wget -O /usr/local/include/bcrypt/BCrypt.hpp https://raw.githubusercontent.com/trusch/bcrypt/master/include/bcrypt/BCrypt.hpp
+          sudo cp /tmp/bcrypt/include/bcrypt/BCrypt.hpp /usr/local/include/bcrypt/
 
       - name: Install Crow (header-only)
         run: |
