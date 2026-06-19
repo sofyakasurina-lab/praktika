@@ -39,6 +39,7 @@ jobs:
             libssl-dev \
             libpqxx-dev \
             libcrypt-dev \
+            libasio-dev \
             nlohmann-json3-dev \
             pkg-config
 
